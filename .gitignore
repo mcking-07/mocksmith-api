@@ -1,0 +1,11 @@
+# build files
+dist/
+
+# env variables
+.env
+
+# node modules
+node_modules/
+
+# scratchpad
+.scratchpad/
