@@ -1,9 +1,10 @@
 import type { ListenerType } from '../../types';
+import { AnalyticsListener } from './analytics';
 
 class EventListener {
   private readonly listeners: ListenerType[];
   constructor() {
-    this.listeners = [];
+    this.listeners = [new AnalyticsListener()];
   }
 
   initialize = () => {
