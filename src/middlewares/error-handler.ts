@@ -13,6 +13,10 @@ class ErrorHandler implements Middleware {
       ['BAD_REQUEST', 400],
       ['NOT_FOUND', 404],
       ['VALIDATION_FAILED', 422],
+      ['CONFLICT', 409],
+      ['SERVICE_NOT_REGISTERED', 500],
+      ['PERSISTENCE_FAILED', 500],
+      ['HANDLER_EXECUTION_FAILED', 500],
       ['INTERNAL_ERROR', 500]
     ]);
   }
