@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from 'bun';
-import { async_store } from '../common/context-store';
+import { async_store } from '../common';
 import type { Context, Middleware, NextFunction } from '../types';
 
 class RequestContext implements Middleware {

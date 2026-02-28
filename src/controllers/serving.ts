@@ -1,8 +1,7 @@
 import { loggerFor, responsify } from '../common';
 import { config } from '../config';
 import { HandlerExecutionFailed } from '../errors';
-import { EventPublisher } from '../eventing';
-import { EndpointRequested } from '../eventing/events';
+import { EventPublisher, EndpointRequested } from '../eventing';
 import { services } from '../services';
 import type { Context } from '../types';
 

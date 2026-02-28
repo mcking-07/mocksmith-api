@@ -1,6 +1,6 @@
 import { loggerFor, ShutdownManager } from './common';
 import { config } from './config';
-import { listeners } from './eventing/listeners';
+import { listeners } from './eventing';
 import { AccessLog, Authentication, BodyParser, CORS, ErrorHandler, RateLimiter, RequestContext } from './middlewares';
 import { Router, configure } from './routes';
 

@@ -1,5 +1,4 @@
-import { loggerFor, responsify } from '../common';
-import { Validator } from '../common/validation';
+import { loggerFor, responsify, Validator } from '../common';
 import { ValidationFailed } from '../errors';
 import { services } from '../services';
 import type { Context } from '../types';

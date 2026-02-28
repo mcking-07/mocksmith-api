@@ -1,8 +1,7 @@
 import type { EndpointsRepository } from '../database';
 import { Conflict, NotFound, PersistenceFailed, ValidationFailed } from '../errors';
-import { EventPublisher } from '../eventing';
-import { EndpointCreated, EndpointDeleted, EndpointUpdated } from '../eventing/events';
-import type { SandboxService } from '.';
+import { EventPublisher, EndpointCreated, EndpointDeleted, EndpointUpdated } from '../eventing';
+import type { SandboxService } from './sandbox';
 
 class EndpointsService {
   private readonly endpoints: EndpointsRepository;
