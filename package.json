@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
-    "ci": "bun ci && bun lint && bun test"
+    "ci": "bun ci && bun lint && bun test",
+    "db": "bun run database/index.ts help",
+    "db:create": "bun run database/index.ts create",
+    "db:status": "bun run database/index.ts status",
+    "db:migrate": "bun run database/index.ts migrate"
   },
   "author": "muzammil_07",
   "license": "MIT",
