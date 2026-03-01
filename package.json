@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
+    "lint": "eslint .",
     "ci": "bun ci && bun lint && bun test",
     "db": "bun run database/index.ts help",
     "db:create": "bun run database/index.ts create",

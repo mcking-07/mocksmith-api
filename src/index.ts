@@ -34,4 +34,4 @@ const server = Bun.serve({
 const shutdown = new ShutdownManager(server);
 shutdown.listen();
 
-logger.info(`mocksmith-api running on port ${config.server.port}`);
+logger.info(`mocksmith-api running on port ${server?.port}`);
