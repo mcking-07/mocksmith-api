@@ -1,6 +1,7 @@
+import { match } from 'path-to-regexp';
 import type { EndpointsRepository } from '../database';
 import { Conflict, NotFound, PersistenceFailed, ValidationFailed } from '../errors';
-import { EventPublisher, EndpointCreated, EndpointDeleted, EndpointUpdated } from '../eventing';
+import { EndpointCreated, EndpointDeleted, EndpointUpdated, EventPublisher } from '../eventing';
 import type { SandboxService } from './sandbox';
 
 class EndpointsService {
@@ -39,10 +40,16 @@ class EndpointsService {
   };
 
   find_by_path_and_method = (path: string, method: string) => {
-    const endpoint = this.endpoints.find_by_path_and_method(path, method);
-    if (!endpoint) throw new NotFound(`endpoint not found with path ${path} and method ${method}`, { path, method });
+    const endpoints = this.endpoints.find_by_method(method);
 
-    return endpoint;
+    for (const endpoint of endpoints) {
+      const matcher = match(endpoint?.path);
+      const result = matcher(path);
+
+      if (result) return { ...endpoint, params: result.params };
+    }
+
+    throw new NotFound(`endpoint not found with path ${path} and method ${method}`, { path, method });
   };
 
   update = (id: string, path?: string, method?: string, handler?: string) => {

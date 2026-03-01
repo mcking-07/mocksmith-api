@@ -1,4 +1,4 @@
-import { loggerFor, ShutdownManager } from './common';
+import { ShutdownManager, loggerFor } from './common';
 import { config } from './config';
 import { listeners } from './eventing';
 import { AccessLog, Authentication, BodyParser, CORS, ErrorHandler, RateLimiter, RequestContext } from './middlewares';

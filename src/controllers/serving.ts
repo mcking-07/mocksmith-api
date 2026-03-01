@@ -1,7 +1,7 @@
 import { loggerFor, responsify } from '../common';
 import { config } from '../config';
 import { HandlerExecutionFailed } from '../errors';
-import { EventPublisher, EndpointRequested } from '../eventing';
+import { EndpointRequested, EventPublisher } from '../eventing';
 import { services } from '../services';
 import type { Context } from '../types';
 
@@ -17,7 +17,7 @@ class ServingController {
   };
 
   serve = async (context: Context) => {
-    const { req, req: { method = 'GET' }, url, url: { pathname = '' }, params, body } = context;
+    const { req, req: { method = 'GET' }, url, url: { pathname = '' }, body } = context;
     logger.info(`serving ${method} method with endpoint ${pathname}`);
 
     const endpoints = this.get_endpoints_service();
@@ -28,10 +28,11 @@ class ServingController {
 
     const query = Object.fromEntries(url.searchParams);
     const headers = Object.fromEntries(req.headers);
+    const params = endpoint?.params ?? {};
 
     const [error, response] = await sandbox.execute(endpoint?.handler, { query, headers, params, body });
     if (error) {
-      const timedout = error.message?.includes('timed out') || false;
+      const timedout = error.cause === 'ETIMEDOUT';
 
       const payload = { endpoint_id: endpoint?.id, cause: error.message, ...(timedout && { timeout_ms: config?.sandbox?.timeout }) };
       throw new HandlerExecutionFailed(error?.message, payload);

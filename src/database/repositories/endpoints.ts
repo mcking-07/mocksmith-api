@@ -12,6 +12,10 @@ class EndpointsRepository extends Repository<EndpointsType> {
     return this.database.get<EndpointsType>('SELECT * FROM endpoints WHERE path = ? AND method = ? AND deleted_at IS NULL', [path, method]);
   };
 
+  find_by_method = (method: string) => {
+    return this.database.query<EndpointsType>('SELECT * FROM endpoints WHERE method = ? AND deleted_at IS NULL', [method]);
+  };
+
   find_active = () => {
     return this.database.query<EndpointsType>('SELECT * FROM endpoints WHERE deleted_at IS NULL ORDER BY created_at DESC');
   };

@@ -18,7 +18,7 @@ class SandboxService {
     return new Promise<never>((_, reject) => {
       setTimeout(() => {
         child.kill();
-        reject(new Error(`sandbox execution timeout after ${timeout_ms}ms`));
+        reject(new Error(`sandbox execution timeout after ${timeout_ms}ms`, { cause: 'ETIMEDOUT' }));
       }, timeout_ms);
     });
   };

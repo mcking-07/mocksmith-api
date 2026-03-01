@@ -1,4 +1,4 @@
-import { loggerFor, responsify, Validator } from '../common';
+import { Validator, loggerFor, responsify } from '../common';
 import { ValidationFailed } from '../errors';
 import { services } from '../services';
 import type { Context } from '../types';
@@ -25,7 +25,7 @@ class EndpointsController {
     const body = context?.body as Record<string, unknown>;
     const validator = new Validator<{ path: string; method: string; handler: string; }>(body);
 
-    const { success, errors, payload } = validator.string('path').string('method').string('handler').validate();
+    const { success, errors, payload } = validator.path('path').string('method').string('handler').validate();
     if (!success) throw new ValidationFailed('validation failed', errors);
 
     const service = this.get_endpoints_service();
@@ -40,7 +40,7 @@ class EndpointsController {
     const body = context?.body as Record<string, unknown>;
     const validator = new Validator<{ path: string; method: string; handler: string; }>(body);
 
-    const { success, errors, payload } = validator.string('path').string('method').string('handler').validate();
+    const { success, errors, payload } = validator.path('path', { optional: true }).string('method', { optional: true }).string('handler', { optional: true }).validate();
     if (!success) throw new ValidationFailed('validation failed', errors);
 
     const service = this.get_endpoints_service();
