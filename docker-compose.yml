@@ -1,0 +1,56 @@
+---
+services:
+  mocksmith:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mocksmith-api
+    restart: unless-stopped
+    ports:
+      - ${PORT:-6543}:${PORT:-6543}
+    volumes:
+      - database:/app/database
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${PORT:-6543}
+      - DATABASE_PATH=${DATABASE_PATH:-./database/mocksmith.db}
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 512M
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    networks:
+      - network
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mocksmith-migrations
+    restart: 'no'
+    command: 'bun run db:migrate'
+    volumes:
+      - database:/app/database
+    environment:
+      - DATABASE_PATH=${DATABASE_PATH:-./database/mocksmith.db}
+      - DATABASE_MIGRATIONS_PATH=${DATABASE_MIGRATIONS_PATH:-./database/migrations}
+    networks:
+      - network
+
+volumes:
+  database:
+    driver: local
+    driver_opts:
+      type: bind
+      device: './database'
+      o: bind
+
+networks:
+  network:
+    driver: bridge

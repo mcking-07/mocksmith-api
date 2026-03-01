@@ -1,0 +1,25 @@
+# build files
+dist/
+
+# docker files
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# documentation
+*.md
+LICENSE
+
+# env variables
+.env
+
+# git files
+.git
+.gitignore
+.github
+
+# node modules
+node_modules/
+
+# scratchpad
+.scratchpad/
