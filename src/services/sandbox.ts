@@ -1,3 +1,4 @@
+import { parse } from 'acorn';
 import { safe } from '../common';
 import { config } from '../config';
 import type { SandboxContext, SandboxResponse } from '../types';
@@ -11,7 +12,7 @@ class SandboxService {
   }
 
   validate = safe((code: string) => {
-    return new Function(`return ${code}`);
+    return parse(`(${code})`, { ecmaVersion: 'latest', sourceType: 'script' });
   });
 
   private kill_on_timeout = (child: ReturnType<typeof Bun.spawn>, timeout_ms: number) => {
@@ -42,7 +43,7 @@ class SandboxService {
 
   execute = safe(async (code: string, context: SandboxContext) => {
     const wrapped = this.wrapped(code, context);
-    const subprocess = Bun.spawn([this.bun_path, '-e', wrapped], { stdout: 'pipe', stderr: 'inherit' });
+    const subprocess = Bun.spawn([this.bun_path, '-e', wrapped], { stdout: 'pipe', stderr: 'pipe', ...config?.sandbox });
 
     await Promise.race([subprocess.exited, this.kill_on_timeout(subprocess, this.timeout)]);
     const response = JSON.parse(await subprocess.stdout.text()) as SandboxResponse;

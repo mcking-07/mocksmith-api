@@ -31,7 +31,14 @@ const config = {
     }
   },
   sandbox: {
-    timeout: 5000
+    timeout: 10000,
+    env: {
+      PATH: Bun.env.PATH ?? '/usr/bin:/bin',
+      NODE_ENV: 'production',
+      HOME: '/tmp',
+      TMPDIR: '/tmp'
+    },
+    cwd: '/tmp'
   }
 };
 
