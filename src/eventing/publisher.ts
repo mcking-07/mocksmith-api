@@ -18,6 +18,8 @@ class EventPublisher {
     return emitter.on(event, this.wrapped(listener));
   };
 
+  static release = () => emitter.removeAllListeners();
+
   private static wrapped = <EventType extends BaseEvent>(handler: EventHandler<EventType>) => safe((event: EventType) => {
     logger.info(`received event ${event?.name || 'unknown'} for handler ${handler.name} with payload:`, event?.payload);
     return handler(event);

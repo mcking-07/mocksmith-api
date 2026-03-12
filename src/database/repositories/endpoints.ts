@@ -1,6 +1,6 @@
 import { safe } from '../../common';
 import type { EndpointsType } from '../../types';
-import { type Database } from '../database';
+import type { Database } from '../database';
 import { Repository } from './repository';
 
 class EndpointsRepository extends Repository<EndpointsType> {

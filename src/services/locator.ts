@@ -57,4 +57,4 @@ services.register('service:analytics', new AnalyticsService(services.resolve('da
 services.register('service:endpoints', new EndpointsService(services.resolve('database:endpoints'), services.resolve('service:sandbox')));
 services.register('service:healthcheck', new HealthService(services.resolve('database')));
 
-export { services };
+export { services, ServiceRegistry };

@@ -1,6 +1,6 @@
 import { safe } from '../../common';
 import type { AnalyticsType } from '../../types';
-import { type Database } from '../database';
+import type { Database } from '../database';
 import { Repository } from './repository';
 
 class AnalyticsRepository extends Repository<AnalyticsType> {

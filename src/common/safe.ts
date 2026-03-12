@@ -3,8 +3,10 @@ import { loggerFor } from './logger';
 
 const logger = loggerFor(import.meta.url);
 
+const { env: { NODE_ENV } = {} } = process;
+
 const default_transformer = (error: Error) => {
-  logger.error('[!] safe: an error occurred:', error);
+  if (NODE_ENV !== 'test') logger.error('[!] safe: an error occurred:', error);
   return error;
 };
 

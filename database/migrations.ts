@@ -3,6 +3,8 @@ import { migrate, getMigrations as get_migrations, getDatabaseVersion as get_app
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 
+const { env: { NODE_ENV } = {} } = process;
+
 type Command = 'migrate' | 'status' | 'create' | 'help';
 type Handler = (params: Partial<ValidatedParams>) => Promise<void>;
 type Handlers = Record<Command, Handler>;
@@ -37,7 +39,7 @@ class Migrations {
     const applied = after - before;
 
     const message = applied === 0 ? `no pending migrations (version ${after})` : `${applied} migrations applied (version ${before} → ${after})`;
-    console.log(`\n[+] ${message}`);
+    if (NODE_ENV !== 'test') console.log(`\n[+] ${message}`);
   }
 
   private async handle_status() {

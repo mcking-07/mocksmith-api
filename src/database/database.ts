@@ -26,6 +26,10 @@ class Database {
   public close = () => {
     this.database.close();
   };
+
+  public get underlying() {
+    return this.database;
+  }
 }
 
 export { Database };
