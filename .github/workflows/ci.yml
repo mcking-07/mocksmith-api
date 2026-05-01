@@ -1,0 +1,107 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUN_VERSION: '1.3.10'
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+        env:
+          DATABASE_PATH: ':memory:'
+          HOSTNAME: '127.0.0.1'
+          PORT: '6543'
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build image
+        run: docker build -t mocksmith-api:ci .
+
+      - name: start container
+        run: |
+          docker run -d --name mocksmith \
+            -p 6543:6543 \
+            -e DATABASE_PATH=/tmp/ci.db \
+            -e DATABASE_MIGRATIONS_PATH=./database/migrations \
+            -e HOSTNAME=0.0.0.0 \
+            -e PORT=6543 \
+            mocksmith-api:ci \
+            sh -c "bun run db:migrate && bun src/index.ts"
+
+      - name: wait for healthy
+        run: |
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:6543/healthcheck > /dev/null 2>&1; then
+              echo "container healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "container failed to become healthy"
+          docker logs mocksmith
+          exit 1
+
+      - name: smoke test
+        run: |
+          # healthcheck
+          curl -sf http://localhost:6543/healthcheck | jq -e '.status == "healthy"'
+
+          # api info
+          curl -sf http://localhost:6543/ | jq -e '.name == "mocksmith-api"'
+
+          # create endpoint
+          ENDPOINT=$(curl -sf -X POST http://localhost:6543/endpoints \
+            -H 'content-type: application/json' \
+            -d '{"path":"/smoke","method":"GET","handler":"() => ({ status: 200, body: { ci: true } })"}')
+          echo "$ENDPOINT" | jq -e '.id'
+          ENDPOINT_ID=$(echo "$ENDPOINT" | jq -r '.id')
+
+          # serve mocked endpoint
+          curl -sf http://localhost:6543/smoke | jq -e '.ci == true'
+
+          # verify analytics
+          curl -sf http://localhost:6543/analytics/$ENDPOINT_ID | jq -e '.request_count >= 1'
+
+          # delete endpoint
+          curl -sf -X DELETE http://localhost:6543/endpoints/$ENDPOINT_ID | jq -e '.message'
+
+          # verify 404 after delete
+          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:6543/smoke)
+          [ "$STATUS" = "404" ] || (echo "expected 404, got $STATUS" && exit 1)
+
+      - name: cleanup
+        if: always()
+        run: docker rm -f mocksmith
