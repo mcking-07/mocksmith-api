@@ -2,6 +2,7 @@
 
 [![Bun](https://img.shields.io/badge/Bun-1.3+-violet)](https://bun.sh)
 [![SQLite](https://img.shields.io/badge/SQLite-3-teal)](https://sqlite.org)
+[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](https://opensource.org/licenses/MIT)
 
 a general-purpose api mocking service built with bun and sqlite. dynamically create, manage, and serve rest-api endpoints with custom javascript handlers.
@@ -24,6 +25,17 @@ bun run dev
 ```
 
 the api will be available at `http://localhost:6543`.
+
+## architecture
+
+| component         | responsibility                                                    |
+| ----------------- | ----------------------------------------------------------------- |
+| `Router`          | custom middleware composition engine with path-to-regexp matching |
+| `Middleware`      | class-based, each implements `handle(context, next)`              |
+| `ServiceRegistry` | typed service locator for dependency wiring                       |
+| `SandboxService`  | subprocess-isolated javascript execution with timeout             |
+| `EventPublisher`  | node eventemitter-based pub/sub for decoupled analytics           |
+| `Repository`      | generic base with `create`, `read`, `update`, `delete`            |
 
 ## handler format
 
@@ -89,6 +101,7 @@ handlers are **javascript arrow function strings** that receive a context object
 | `bun run dev`        | development with hot reload |
 | `bun run start`      | production server           |
 | `bun run lint`       | run eslint                  |
+| `bun run test`       | run test suite              |
 | `bun run db:create`  | create database             |
 | `bun run db:migrate` | run migrations              |
 | `bun run db:status`  | check database status       |
@@ -115,14 +128,61 @@ or use the provided `docker-compose.yml` file.
 docker compose up
 ```
 
-## usage examples
+**docker features:**
 
-### basic json response (200)
+- multi-stage build (deps → production)
+- non-root user (`mocksmith`)
+- resource limits (0.5 cpu, 512m memory)
+- separate migration init container
+
+## security
+
+### sandbox isolation
+
+user-submitted handlers execute in isolated subprocesses:
+
+| layer                  | mechanism                                                               |
+| ---------------------- | ----------------------------------------------------------------------- |
+| ast validation         | `acorn` parses handler code before execution — rejects invalid syntax   |
+| subprocess isolation   | runs via `bun -e` in a separate process — no shared memory              |
+| timeout enforcement    | subprocess killed after 10s (configurable via `config.sandbox.timeout`) |
+| restricted environment | `PATH`, `HOME`, `TMPDIR` scoped to `/tmp`, `cwd` set to `/tmp`          |
+| no network access      | sandbox subprocess has no outbound connectivity                         |
+
+### attack vectors mitigated
+
+| vector                | mitigation                                       |
+| --------------------- | ------------------------------------------------ |
+| infinite loops        | subprocess timeout with `SIGKILL`                |
+| memory bombs          | subprocess resource isolation                    |
+| file system access    | `cwd: /tmp`, minimal `PATH`                      |
+| `require()` / imports | `sourceType: 'script'` in acorn parser           |
+| prototype pollution   | fresh subprocess per execution — no shared state |
+
+## design decisions
+
+### why subprocess sandboxing over vm2?
+
+- `vm2` has known escape vulnerabilities (cve-2023-37466)
+- subprocess provides os-level isolation
+- timeout enforcement is reliable (`SIGKILL` vs cooperative cancellation)
+- trade-off: ~50ms overhead per handler execution
+
+### why custom router over hono/elysia?
+
+- demonstrates middleware composition from scratch (~50 lines)
+- no dependency for a core abstraction
+- full control over route matching, middleware ordering, and skip logic
+- the `compose` pattern is the same one express/koa use internally
+
+## handler cookbook
+
+### static responses
+
+**basic json response:**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/users",
     "method": "get",
     "handler": "(context) => ({ status: 200, body: { users: [{ id: 1, name: \"john\" }, { id: 2, name: \"jane\" }] } })"
@@ -134,56 +194,12 @@ curl http://localhost:6543/users
 # { "users": [{ "id": 1, "name": "john" }, { "id": 2, "name": "jane" }] }
 ```
 
-### create resource with validation (201 / 400)
-
-```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
-    "path": "/users",
-    "method": "post",
-    "handler": "(context) => { if (!context.body?.name) return { status: 400, body: { error: \"name is required\" } }; const id = math.floor(math.random() * 1000); return { status: 201, headers: { location: \"/users/\" + id }, body: { id, name: context.body.name, created: true } }; }"
-  }'
-```
-
-```bash
-curl -x post http://localhost:6543/users -h "content-type: application/json" -d '{"name": "alice"}'
-# { "id": 847, "name": "alice", "created": true }
-
-curl -x post http://localhost:6543/users -h "content-type: application/json" -d '{}'
-# { "error": "name is required" }
-```
-
-### authentication flow (401 / 200)
-
-```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
-    "path": "/profile",
-    "method": "get",
-    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (!token) return { status: 401, headers: { \"www-authenticate\": \"bearer\" }, body: { error: \"authentication required\" } }; if (token !== \"valid-token-123\") return { status: 401, body: { error: \"invalid token\" } }; return { status: 200, body: { id: 1, name: \"john\", email: \"john@example.com\" } }; }"
-  }'
-```
-
-```bash
-curl http://localhost:6543/profile
-# { "error": "authentication required" }
-
-curl http://localhost:6543/profile -h "authorization: bearer valid-token-123"
-# { "id": 1, "name": "john", "email": "john@example.com" }
-```
-
-### path parameters
-
-create endpoints with dynamic path segments using `:param` and `*wildcard` syntax:
+### path matching
 
 **named parameters:**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/orgs/:orgId/teams/:teamId/projects/:projectId",
     "method": "get",
     "handler": "(context) => ({ status: 200, body: { org: context.params.orgId, team: context.params.teamId, project: context.params.projectId } })"
@@ -198,9 +214,7 @@ curl http://localhost:6543/orgs/acme/teams/engineering/projects/alpha
 **wildcard parameters:**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/files/*filepath",
     "method": "get",
     "handler": "(context) => ({ status: 200, body: { segments: context.params.filepath, path: context.params.filepath?.join(\"/\") } })"
@@ -214,12 +228,12 @@ curl http://localhost:6543/files/docs/2024/reports/annual.pdf
 
 **note:** wildcards return an array of segments. use `.join("/")` to reconstruct the full path.
 
-### resource not found (404)
+### status codes
+
+**resource not found (404):**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/users/:id",
     "method": "get",
     "handler": "(context) => { const users = { \"123\": { id: \"123\", name: \"john\" } }; const user = users[context.params.id]; if (!user) return { status: 404, body: { error: \"user not found\", id: context.params.id } }; return { status: 200, body: { user } }; }"
@@ -234,83 +248,136 @@ curl http://localhost:6543/users/999
 # { "error": "user not found", "id": "999" }
 ```
 
-### validation errors (422)
+**temporary redirect (302):**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
-    "path": "/register",
-    "method": "post",
-    "handler": "(context) => { const errors = []; if (!context.body?.email) errors.push({ field: "email", message: "required" }); else if (!context.body.email.includes("@")) errors.push({ field: "email", message: "invalid format" }); if (!context.body?.password) errors.push({ field: "password", message: "required" }); else if (context.body.password.length < 8) errors.push({ field: "password", message: "must be at least 8 characters" }); if (errors.length > 0) return { status: 422, body: { error: "validation failed", errors } }; return { status: 201, body: { id: 123, email: context.body.email } }; }"
-  }'
-```
-
-```bash
-curl -x post http://localhost:6543/register -h "content-type: application/json" -d '{"email": "invalid", "password": "123"}'
-# { "error": "validation failed", "errors": [{ "field": "email", "message": "invalid format" }, { "field": "password", "message": "must be at least 8 characters" }] }
-
-curl -x post http://localhost:6543/register -h "content-type: application/json" -d '{"email": "user@example.com", "password": "securepass123"}'
-# { "id": 123, "email": "user@example.com" }
-```
-
-### rate limiting (429)
-
-```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
-    "path": "/api/limited",
-    "method": "get",
-    "handler": "(context) => { const key = context.headers[\"x-api-key\"]; if (key === \"blocked\") return { status: 429, body: { error: \"rate limit exceeded\" } }; return { status: 200, body: { data: [] } }; }"
-  }'
-
-curl http://localhost:6543/api/limited -h "x-api-key: valid"     # => 200
-curl http://localhost:6543/api/limited -h "x-api-key: blocked"    # => 429
-```
-
-### redirects (301 / 302)
-
-```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/login",
     "method": "get",
-    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (token === \"valid-token\") return { status: 302, headers: { location: \"/dashboard\" }, body: { message: "redirecting" } }; return { status: 200, body: { form: true } }; }"
+    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (token === \"valid-token\") return { status: 302, headers: { location: \"/dashboard\" }, body: { message: \"redirecting\" } }; return { status: 200, body: { form: true } }; }"
   }'
+```
 
-# temporary redirect (302)
-curl http://localhost:6543/login -h "authorization: bearer valid-token"
+```bash
+curl http://localhost:6543/login -H "authorization: bearer valid-token"
 # => 302 location: /dashboard
+```
 
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+**permanent redirect (301):**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/v1/*path",
-    "method": "get", 
-    "handler": "(context) => ({ status: 301, headers: { location: \"/v2/\" + context.params.path?.join(\"/\") } })"
+    "method": "get",
+    "handler": "(context) => ({ status: 301, headers: { location: \"/v2\" + context.params.path?.join(\"/\") } })"
   }'
+```
 
-# permanent redirect (301)
-curl -l http://localhost:6543/v1/users
+```bash
+curl -L http://localhost:6543/v1/users
 # => 301 location: /v2/users
 ```
 
-### server errors (500 / 503)
+**validation errors (422):**
 
 ```bash
-curl -x post http://localhost:6543/endpoints \
-  -h "content-type: application/json" \
-  -d '{
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
+    "path": "/register",
+    "method": "post",
+    "handler": "(context) => { const errors = []; if (!context.body?.email) errors.push({ field: \"email\", message: \"required\" }); else if (!context.body.email.includes("@")) errors.push({ field: \"email\", message: \"invalid format\" }); if (!context.body?.password) errors.push({ field: \"password\", message: \"required\" }); else if (context.body.password.length < 8) errors.push({ field: \"password\", message: \"must be at least 8 characters\" }); if (errors.length > 0) return { status: 422, body: { error: \"validation failed\", errors } }; return { status: 201, body: { id: 123, email: context.body.email } }; }"
+  }'
+```
+
+```bash
+curl -X post http://localhost:6543/register -H "content-type: application/json" -d '{"email": "invalid", "password": "123"}'
+# { "error": "validation failed", "errors": [{ "field": "email", "message": "invalid format" }, { "field": "password", "message": "must be at least 8 characters" }] }
+
+curl -X post http://localhost:6543/register -H "content-type: application/json" -d '{"email": "user@example.com", "password": "secure-password"}'
+# { "id": 123, "email": "user@example.com" }
+```
+
+**error simulation:**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/api/status",
     "method": "get",
-    "handler": "(context) => { if (context.query.error === \"500\") return { status: 500, body: { error: \"internal error\" } }; if (context.query.error === \"503\") return { status: 503, body: { error: \"service unavailable\" } }; return { status: 200, body: { status: \"ok\" } }; }"
+    "handler": "(context) => { const code = parseInt(context.query.status) || 200; const responses = { 200: { body: { ok: true } }, 400: { body: { error: \"bad request\" } }, 401: { body: { error: \"unauthorized\" } }, 404: { body: { error: \"not found\" } }, 429: { body: { error: \"rate limited\" } }, 500: { body: { error: \"internal error\" } }, 503: { body: { error: \"service unavailable\" } } }; const response = responses[code] || responses[200]; return { status: code, ...response }; }"
   }'
+```
 
-curl "http://localhost:6543/api/status?error=500"  # => 500
-curl "http://localhost:6543/api/status?error=503"  # => 503
-curl "http://localhost:6543/api/status"            # => 200
+```bash
+curl "http://localhost:6543/api/status"                # 200
+curl "http://localhost:6543/api/status?status=404"      # 404
+curl "http://localhost:6543/api/status?status=500"      # 500
+```
+
+### advanced patterns
+
+**paginated list:**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
+    "path": "/items",
+    "method": "get",
+    "handler": "(context) => { const page = parseInt(context.query.page) || 1; const limit = parseInt(context.query.limit) || 10; const items = Array.from({ length: limit }, (_, i) => ({ id: (page - 1) * limit + i + 1, name: \"item \" + ((page - 1) * limit + i + 1) })); return { status: 200, body: { data: items, meta: { page, limit, total: 100 } } }; }"
+  }'
+```
+
+```bash
+curl "http://localhost:6543/items?page=2&limit=3"
+# { "data": [{ "id": 4, "name": "item 4" }, ...], "meta": { "page": 2, "limit": 3, "total": 100 } }
+```
+
+**authentication flow (401 / 200):**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
+    "path": "/profile",
+    "method": "get",
+    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (!token) return { status: 401, headers: { \"www-authenticate\": \"bearer\" }, body: { error: \"authentication required\" } }; if (token !== "valid-token-123") return { status: 401, body: { error: \"invalid token\" } }; return { status: 200, body: { id: 1, name: "john", email: \"john@example.com\" } }; }"
+  }'
+```
+
+```bash
+curl http://localhost:6543/profile
+# { "error": \"authentication required\" }
+
+curl http://localhost:6543/profile -H "authorization: bearer valid-token-123"
+# { "id": 1, "name": "john", "email": \"john@example.com\" }
+```
+
+**conditional response by header:**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
+    "path": "/negotiate",
+    "method": "get",
+    "handler": "(context) => { const accept = context.headers.accept || \"\"; if (accept.includes(\"text/plain\")) return { status: 200, headers: { \"content-type\": \"text/plain\" }, body: \"hello world\" }; return { status: 200, body: { message: \"hello world\" } }; }"
+  }'
+```
+
+```bash
+curl http://localhost:6543/negotiate -H "accept: text/plain"
+# hello world
+
+curl http://localhost:6543/negotiate -H "accept: application/json"
+# { "message": "hello world" }
+```
+
+**delayed response (simulated latency):**
+
+```bash
+curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
+    "path": "/slow",
+    "method": "get",
+    "handler": "async (context) => { const delay = parseInt(context.query.delay) || 1000; await new Promise(r => setTimeout(r, delay)); return { status: 200, body: { delayed: true, ms: delay } }; }"
+  }'
+```
+
+```bash
+curl "http://localhost:6543/slow?delay=2000"
+# { "delayed": true, "ms": 2000 }  (after 2 seconds)
 ```
 
 ## contributing
