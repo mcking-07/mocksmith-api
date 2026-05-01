@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: mocksmith-api
     container_name: mocksmith-api
     restart: unless-stopped
     ports:
@@ -32,6 +33,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: mocksmith-api
     container_name: mocksmith-migrations
     restart: 'no'
     command: 'bun run db:migrate'
