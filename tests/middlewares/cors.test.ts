@@ -18,7 +18,8 @@ describe('CORS', () => {
       const context = contextify({ req: new Request(endpoint, { headers: { origin: origins[0] } }) });
 
       const response = await middleware.handle(context, next);
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origins[0]);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+      expect(response.headers.get('Vary')).toBeNull();
     });
 
     test('should handle wildcard origin', async () => {
@@ -26,7 +27,8 @@ describe('CORS', () => {
       const context = contextify({ req: new Request(endpoint, { headers: { origin: origins[1] } }) });
 
       const response = await middleware.handle(context, next);
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origins[1]);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+      expect(response.headers.get('Vary')).toBeNull();
     });
 
     test('should handle allowed origins list', async () => {
@@ -35,6 +37,7 @@ describe('CORS', () => {
 
       const response = await middleware.handle(context, next);
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origins[0]);
+      expect(response.headers.get('Vary')).toBe('Origin');
     });
 
     test('should reject origin not in allowed list', async () => {
@@ -43,6 +46,7 @@ describe('CORS', () => {
 
       const response = await middleware.handle(context, next);
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe('');
+      expect(response.headers.get('Vary')).toBe('Origin');
     });
 
     test('should handle preflight OPTIONS request', async () => {

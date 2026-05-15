@@ -11,8 +11,6 @@ class CORS implements Middleware {
   }
 
   private is_origin_allowed = (origin: string) => {
-    if (this.options.origin === '*') return true;
-
     if (Array.isArray(this.options.origin)) {
       return this.options.origin.includes(origin);
     }
@@ -20,12 +18,21 @@ class CORS implements Middleware {
     return this.options.origin === origin;
   };
 
+  private resolve = (origin: string) => {
+    if (this.options.origin !== '*') {
+      return this.is_origin_allowed(origin) ? origin : '';
+    }
+
+    return '*';
+  };
+
   private headers = (origin: string) => {
     const headers = new Headers();
 
-    headers.set('Access-Control-Allow-Origin', this.is_origin_allowed(origin) ? origin : '');
+    headers.set('Access-Control-Allow-Origin', this.resolve(origin));
     headers.set('Access-Control-Allow-Methods', this.options.methods?.join(', ') ?? '');
     headers.set('Access-Control-Allow-Headers', this.options.headers ?? '');
+    if (this.options.origin !== '*') headers.set('Vary', 'Origin');
 
     return headers;
   };
