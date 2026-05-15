@@ -34,7 +34,7 @@ class Repository<Entity = Record<string, unknown>> {
     const values = Object.values(payload) as SQLQueryBindings[];
     const clause = keys.map(key => `${key} = ?`).join(', ');
 
-    return this.database.run(`UPDATE ${this.table} SET ${clause} WHERE id = ?`, [...values, id]);
+    return this.database.run(`UPDATE ${this.table} SET ${clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [...values, id]);
   });
 
   delete = safe((id: string) => {
