@@ -143,21 +143,21 @@ user-submitted handlers execute in isolated subprocesses:
 
 | layer                  | mechanism                                                               |
 | ---------------------- | ----------------------------------------------------------------------- |
-| ast validation         | `acorn` parses handler code before execution — rejects invalid syntax   |
+| ast validation         | `acorn` parses handler code — rejects invalid syntax                    |
 | subprocess isolation   | runs via `bun -e` in a separate process — no shared memory              |
 | timeout enforcement    | subprocess killed after 10s (configurable via `config.sandbox.timeout`) |
 | restricted environment | `PATH`, `HOME`, `TMPDIR` scoped to `/tmp`, `cwd` set to `/tmp`          |
-| no network access      | sandbox subprocess has no outbound connectivity                         |
 
 ### attack vectors mitigated
 
-| vector                | mitigation                                       |
-| --------------------- | ------------------------------------------------ |
-| infinite loops        | subprocess timeout with `SIGKILL`                |
-| memory bombs          | subprocess resource isolation                    |
-| file system access    | `cwd: /tmp`, minimal `PATH`                      |
-| `require()` / imports | `sourceType: 'script'` in acorn parser           |
-| prototype pollution   | fresh subprocess per execution — no shared state |
+| vector              | mitigation                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| infinite loops      | subprocess timeout with `SIGKILL`                             |
+| memory bombs        | subprocess timeout                                            |
+| file system access  | `cwd: /tmp`, minimal `PATH`                                   |
+| static imports      | `sourceType: 'script'` rejects `import`/`export` declarations |
+| dynamic `import()`  | ast validation rejects `ImportExpression` nodes               |
+| prototype pollution | fresh subprocess per execution — no shared state              |
 
 ## design decisions
 
