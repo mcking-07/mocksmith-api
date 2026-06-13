@@ -1,4 +1,5 @@
 import { parse } from 'acorn';
+import { simple } from 'acorn-walk';
 import { safe } from '../common';
 import { config } from '../config';
 import type { SandboxContext, SandboxResponse } from '../types';
@@ -12,7 +13,15 @@ class SandboxService {
   }
 
   validate = safe((code: string) => {
-    return parse(`(${code})`, { ecmaVersion: 'latest', sourceType: 'script' });
+    const tree = parse(`(${code})`, { ecmaVersion: 'latest', sourceType: 'script' });
+
+    simple(tree, {
+      ImportExpression() {
+        throw new SyntaxError('dynamic import() is not allowed in handlers');
+      },
+    });
+
+    return tree;
   });
 
   private kill_on_timeout = (child: ReturnType<typeof Bun.spawn>, timeout_ms: number) => {
