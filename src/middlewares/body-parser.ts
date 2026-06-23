@@ -2,8 +2,11 @@ import type { Context, Middleware, NextFunction, Parsers } from '../types';
 
 const DEFAULT_PARSERS: Parsers = {
   'application/json': (req) => req.json(),
+  'application/xml': (req) => req.text(),
   'text/plain': (req) => req.text(),
   'application/x-www-form-urlencoded': async (req) => Object.fromEntries(new URLSearchParams(await req.text())),
+  '+json': (req) => req.json(),
+  '+xml': (req) => req.text(),
 };
 
 class BodyParser implements Middleware {
@@ -21,7 +24,7 @@ class BodyParser implements Middleware {
     const [mime_part] = content_type.split(';');
     const mime = mime_part?.trim()?.toLowerCase() ?? '';
 
-    const parser = this.parsers[mime];
+    const parser = this.parsers[mime] ?? this.parsers[`+${mime.split('+').pop()}`];
     if (!parser) return next();
 
     context.body = await parser(context.req);
