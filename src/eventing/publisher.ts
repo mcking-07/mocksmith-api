@@ -8,6 +8,12 @@ const logger = loggerFor('eventing/publisher');
 const emitter = new EventEmitter();
 
 class EventPublisher {
+  static context: ExecutionContext | null = null;
+
+  static attach = (context: ExecutionContext) => {
+    EventPublisher.context = context;
+  };
+
   static emit = <EventType extends BaseEvent>(event: EventType) => {
     logger.info(`publishing event ${event.name} with payload:`, event?.payload || {});
     return emitter.emit(event.name, event);
@@ -22,7 +28,10 @@ class EventPublisher {
 
   private static wrapped = <EventType extends BaseEvent>(handler: EventHandler<EventType>) => safe((event: EventType) => {
     logger.info(`received event ${event?.name || 'unknown'} for handler ${handler.name} with payload:`, event?.payload);
-    return handler(event);
+    const result = handler(event);
+
+    if (result instanceof Promise) EventPublisher.context?.waitUntil(result);
+    return result;
   });
 }
 

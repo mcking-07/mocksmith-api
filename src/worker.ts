@@ -1,5 +1,5 @@
 import { bootstrap as bootstrap_config, config } from './config';
-import { listeners } from './eventing';
+import { EventPublisher, listeners } from './eventing';
 import { AccessLog, Authentication, BodyParser, CORS, ErrorHandler, RateLimiter, RequestContext } from './middlewares';
 import { Router, configure } from './routes';
 import { bootstrap as bootstrap_services } from './services';
@@ -28,8 +28,10 @@ const bootstrap = (env: EnvironmentType) => {
 };
 
 export default {
-  async fetch(req: Request, env: EnvironmentType): Promise<Response> {
+  async fetch(req: Request, env: EnvironmentType, ctx: ExecutionContext): Promise<Response> {
     const router = bootstrap(env);
+    EventPublisher.attach(ctx);
+
     return router.handle(req).catch((error: Error) => {
       return new Response(JSON.stringify({ error: error?.message ?? 'Internal Server Error' }), {
         status: 500,
