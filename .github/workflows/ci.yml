@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches: [bun-sqlite]
   pull_request:
-    branches: [main, master]
+    branches: [bun-sqlite]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

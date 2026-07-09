@@ -2,7 +2,7 @@
 
 [![Bun](https://img.shields.io/badge/Bun-1.3+-violet)](https://bun.sh)
 [![SQLite](https://img.shields.io/badge/SQLite-3-teal)](https://sqlite.org)
-[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
+[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg?branch=bun-sqlite)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](https://opensource.org/licenses/MIT)
 
 a general-purpose api mocking service built with bun and sqlite. dynamically create, manage, and serve rest-api endpoints with custom javascript handlers.
