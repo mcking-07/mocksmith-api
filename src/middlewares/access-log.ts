@@ -1,7 +1,7 @@
 import { loggerFor } from '../common';
 import type { Context, Middleware, NextFunction } from '../types';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('middlewares/access-log');
 
 class AccessLog implements Middleware {
   handle = async (context: Context, next: NextFunction) => {

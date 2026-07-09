@@ -5,9 +5,7 @@
     "lib": ["ESNext"],
     "module": "Preserve",
     "moduleDetection": "force",
-
-    // frontend support
-    "jsx": "react-jsx",
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types", "node"],
     "allowJs": true,
 
     // module resolution

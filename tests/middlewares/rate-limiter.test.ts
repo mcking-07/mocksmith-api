@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, vi, test } from 'vitest';
 import { RateLimiter } from '../../src/middlewares/rate-limiter';
 import { RateLimited } from '../../src/errors';
 
 describe('RateLimiter', () => {
   describe('handler', () => {
-    const next = mock(() => Promise.resolve(new Response('OK')));
+    const next = vi.fn(() => Promise.resolve(new Response('OK')));
 
     const endpoint = 'https://mocksmith-api.mcking.in/endpoints';
     const headers = { 'x-forwarded-for': '1.1.1.1' };
@@ -29,8 +29,8 @@ describe('RateLimiter', () => {
 
       await middleware.handle(context, next);
 
-      expect(middleware.handle(context, next)).rejects.toThrowError(RateLimited);
-      expect(middleware.handle(context, next)).rejects.toThrow('rate limit exceeded. please try again later.');
+      await expect(middleware.handle(context, next)).rejects.toThrow(RateLimited);
+      await expect(middleware.handle(context, next)).rejects.toThrow('rate limit exceeded. please try again later.');
     });
 
     test('should maintain separate rate limits for different ip addresses', async () => {
@@ -82,7 +82,7 @@ describe('RateLimiter', () => {
       const middleware = new RateLimiter({ maximum_requests: 10 });
       const response = new Response('OK', { headers: { 'content-type': 'application/json' } });
 
-      const next = mock(() => Promise.resolve(response));
+      const next = vi.fn(() => Promise.resolve(response));
       const context = contextify();
 
       const result = await middleware.handle(context, next);

@@ -54,7 +54,7 @@ type RateLimitRecord = {
 
 type RouteOptions = {
   middleware?: Middleware[];
-  skip?: Array<new (...args: unknown[]) => Middleware>;
+  skip?: Array<new (...args: never[]) => Middleware>;
 };
 
 type Route = {
@@ -70,14 +70,6 @@ type SandboxContext = {
   headers: Record<string, string>;
   params: Context['params'];
   body: Context['body'];
-};
-
-type SandboxResponse = {
-  success: false;
-  error: { name: string; message: string; stack: string; };
-} | {
-  success: true;
-  payload: HandlerResponse;
 };
 
 type ValidatorOptions = {
@@ -100,6 +92,5 @@ export type {
   Route,
   RouteOptions,
   SandboxContext,
-  SandboxResponse,
   ValidatorOptions,
 };

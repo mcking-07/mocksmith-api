@@ -1,35 +1,28 @@
-import { type SQLQueryBindings, Database as SQLiteDatabase } from 'bun:sqlite';
 import { safe } from '../common';
 
 class Database {
-  private readonly database: SQLiteDatabase;
-  constructor(path: string) {
-    this.database = new SQLiteDatabase(path);
+  private readonly db: D1Database;
+  constructor(database: D1Database) {
+    this.db = database;
   }
 
-  ping = safe(() => {
-    return this.database.prepare('SELECT 1').get() !== null;
+  ping = safe(async () => {
+    const result = await this.db.prepare('SELECT 1').first();
+    return result !== null;
   });
 
-  public get = <Entity>(sql: string, params?: SQLQueryBindings[]) => {
-    return this.database.prepare(sql).get(...params ?? []) as Entity | null;
+  get = async <Entity>(sql: string, params: (string | number | null | ArrayBuffer)[] = []) => {
+    return this.db.prepare(sql).bind(...params).first<Entity>();
   };
 
-  public query = <Entity>(sql: string, params?: SQLQueryBindings[]) => {
-    return this.database.prepare(sql).all(...params ?? []) as Entity[];
+  query = async <Entity>(sql: string, params: (string | number | null | ArrayBuffer)[] = []) => {
+    const result = await this.db.prepare(sql).bind(...params).all<Entity>();
+    return result.results;
   };
 
-  public run = (sql: string, params?: SQLQueryBindings[]) => {
-    return this.database.prepare(sql).run(...params ?? []);
+  run = async (sql: string, params: (string | number | null | ArrayBuffer)[] = []) => {
+    return this.db.prepare(sql).bind(...params).run();
   };
-
-  public close = () => {
-    this.database.close();
-  };
-
-  public get underlying() {
-    return this.database;
-  }
 }
 
 export { Database };

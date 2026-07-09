@@ -1,18 +1,26 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { setup } from '../setup';
 
 describe('AnalyticsRepository', async () => {
   let services = await setup();
   let analytics_repo = services.resolve('database:analytics');
+  let endpoints_repo = services.resolve('database:endpoints');
 
   beforeEach(async () => {
     services = await setup();
     analytics_repo = services.resolve('database:analytics');
+    endpoints_repo = services.resolve('database:endpoints');
   });
 
+  const create_endpoint = async () => {
+    const [, id] = await endpoints_repo.create({ path: `/test/${crypto.randomUUID()}`, method: 'GET', handler: '() => ({})' });
+    return id!;
+  };
+
   describe('create_for_endpoint', () => {
-    test('should create analytics record for endpoint', () => {
-      const [error, id] = analytics_repo.create_for_endpoint('test-endpoint-123');
+    test('should create analytics record for endpoint', async () => {
+      const endpoint_id = await create_endpoint();
+      const [error, id] = await analytics_repo.create_for_endpoint(endpoint_id);
 
       expect(error).toBeNull();
       expect(typeof id).toBe('string');
@@ -21,11 +29,11 @@ describe('AnalyticsRepository', async () => {
   });
 
   describe('find_by_endpoint_id', () => {
-    test('should return analytics for existing endpoint', () => {
-      const endpoint_id = 'test-endpoint-456';
-      analytics_repo.create_for_endpoint(endpoint_id);
+    test('should return analytics for existing endpoint', async () => {
+      const endpoint_id = await create_endpoint();
+      await analytics_repo.create_for_endpoint(endpoint_id);
 
-      const analytics = analytics_repo.find_by_endpoint_id(endpoint_id);
+      const analytics = await analytics_repo.find_by_endpoint_id(endpoint_id);
 
       expect(analytics).not.toBeNull();
       expect(analytics?.endpoint_id).toBe(endpoint_id);
@@ -34,20 +42,20 @@ describe('AnalyticsRepository', async () => {
   });
 
   describe('increment', () => {
-    test('should increase request count', () => {
-      const endpoint_id = 'test-endpoint-789';
-      analytics_repo.create_for_endpoint(endpoint_id);
+    test('should increase request count', async () => {
+      const endpoint_id = await create_endpoint();
+      await analytics_repo.create_for_endpoint(endpoint_id);
 
-      const [first_error] = analytics_repo.increment(endpoint_id);
+      const [first_error] = await analytics_repo.increment(endpoint_id);
       expect(first_error).toBeNull();
 
-      let analytics = analytics_repo.find_by_endpoint_id(endpoint_id);
+      let analytics = await analytics_repo.find_by_endpoint_id(endpoint_id);
       expect(analytics?.request_count).toBe(1);
 
-      const [second_error] = analytics_repo.increment(endpoint_id);
+      const [second_error] = await analytics_repo.increment(endpoint_id);
       expect(second_error).toBeNull();
 
-      analytics = analytics_repo.find_by_endpoint_id(endpoint_id);
+      analytics = await analytics_repo.find_by_endpoint_id(endpoint_id);
       expect(analytics?.request_count).toBe(2);
     });
   });

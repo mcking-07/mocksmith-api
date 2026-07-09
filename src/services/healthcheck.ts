@@ -1,7 +1,7 @@
 import { loggerFor } from '../common';
 import type { Database } from '../database';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('services/healthcheck');
 
 class HealthService {
   private readonly database: Database;
@@ -12,7 +12,7 @@ class HealthService {
   check = async () => {
     const timestamp = new Date().toISOString();
 
-    const [error] = this.database.ping();
+    const [error] = await this.database.ping();
     if (error) logger.error(`database health check failed with error: ${error?.message}`, error);
 
     const status = error ? 'unhealthy' : 'healthy';
@@ -21,4 +21,5 @@ class HealthService {
     return { status, timestamp, checks };
   };
 }
+
 export { HealthService };

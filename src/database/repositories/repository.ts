@@ -1,5 +1,3 @@
-import { randomUUIDv7 } from 'bun';
-import type { SQLQueryBindings } from 'bun:sqlite';
 import { safe } from '../../common';
 import type { Database } from '../database';
 
@@ -11,33 +9,33 @@ class Repository<Entity = Record<string, unknown>> {
     this.table = table;
   }
 
-  create = safe((payload: Partial<Entity>) => {
-    const id = `${randomUUIDv7()}`;
+  create = safe(async (payload: Partial<Entity>) => {
+    const id = crypto.randomUUID();
 
     const keys = Object.keys({ ...payload, id });
-    const values = Object.values({ ...payload, id }) as SQLQueryBindings[];
+    const values = Object.values({ ...payload, id }) as (string | number | null | ArrayBuffer)[];
     const placeholders = keys.map(() => '?').join(', ');
 
-    this.database.run(`INSERT INTO ${this.table} (${keys.join(', ')}) VALUES (${placeholders})`, values);
+    await this.database.run(`INSERT INTO ${this.table} (${keys.join(', ')}) VALUES (${placeholders})`, values);
     return id;
   });
 
-  read(): Entity[];
-  read(id: string): Entity | null;
-  read(id?: string): Entity | Entity[] | null {
-    if (!id) return this.database.query<Entity>(`SELECT * FROM ${this.table}`) as Entity[];
+  read(): Promise<Entity[]>;
+  read(id: string): Promise<Entity | null>;
+  async read(id?: string): Promise<Entity | Entity[] | null> {
+    if (!id) return this.database.query<Entity>(`SELECT * FROM ${this.table}`);
     return this.database.get<Entity>(`SELECT * FROM ${this.table} WHERE id = ?`, [id]);
   }
 
-  update = safe((id: string, payload: Partial<Entity>) => {
+  update = safe(async (id: string, payload: Partial<Entity>) => {
     const keys = Object.keys(payload);
-    const values = Object.values(payload) as SQLQueryBindings[];
+    const values = Object.values(payload) as (string | number | null | ArrayBuffer)[];
     const clause = keys.map(key => `${key} = ?`).join(', ');
 
     return this.database.run(`UPDATE ${this.table} SET ${clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [...values, id]);
   });
 
-  delete = safe((id: string) => {
+  delete = safe(async (id: string) => {
     return this.database.run(`DELETE FROM ${this.table} WHERE id = ?`, [id]);
   });
 }

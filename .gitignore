@@ -12,3 +12,7 @@ node_modules/
 
 # sqlite database
 mocksmith.db
+
+# cloudflare
+.wrangler/
+.dev.vars

@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, vi, test } from 'vitest';
 import { ErrorHandler } from '../../src/middlewares/error-handler';
 import { BadRequest, NotFound, Unauthorized, ValidationFailed, Conflict } from '../../src/errors';
 
@@ -8,10 +8,10 @@ describe('ErrorHandler', () => {
     const contextify = (overrides = {}) => ({
       req: new Request(endpoint), url: new URL(endpoint), params: {}, state: new Map(), id: 'test-request-id', ...overrides,
     });
-    const nextify = (error: Error) => mock(() => Promise.reject(error));
+    const nextify = (error: Error) => vi.fn(() => Promise.reject(error));
 
     test('should pass through successful responses', async () => {
-      const next = mock(() => Promise.resolve(new Response('OK')));
+      const next = vi.fn(() => Promise.resolve(new Response('OK')));
       const middleware = new ErrorHandler();
       const context = contextify();
 

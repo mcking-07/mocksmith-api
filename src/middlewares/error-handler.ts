@@ -2,7 +2,7 @@ import { loggerFor } from '../common';
 import type { Context, ErrorCode, Middleware, NextFunction } from '../types';
 import { BaseError } from '../errors';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('middlewares/error-handler');
 
 class ErrorHandler implements Middleware {
   private readonly http_status_codes: Map<ErrorCode, number>;
@@ -39,7 +39,7 @@ class ErrorHandler implements Middleware {
   };
 
   handle = async (context: Context, next: NextFunction) => {
-    return await next().catch((error) => this.transformed(error, context));
+    return next().catch((error) => this.transformed(error, context));
   };
 }
 

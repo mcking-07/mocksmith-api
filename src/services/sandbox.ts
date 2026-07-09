@@ -1,15 +1,17 @@
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
+import { getQuickJSWASMModule } from '@cf-wasm/quickjs/workerd';
 import { safe } from '../common';
-import { config } from '../config';
-import type { SandboxContext, SandboxResponse } from '../types';
+import type { SandboxContext } from '../types';
+
+const BLOCKED_IDENTIFIERS = ['eval', 'Function', 'globalThis', 'self', 'navigator', 'WebSocket', 'Atomics', 'SharedArrayBuffer'];
+
+const dispose = (...resources: { dispose: () => void; }[]) => resources.forEach(r => r.dispose());
 
 class SandboxService {
   private readonly timeout: number;
-  private readonly bun_path: string;
-  constructor() {
-    this.timeout = config?.sandbox?.timeout || 20000;
-    this.bun_path = Bun.which('bun') ?? 'bun';
+  constructor(timeout: number = 10000) {
+    this.timeout = timeout;
   }
 
   validate = safe((code: string) => {
@@ -19,49 +21,55 @@ class SandboxService {
       ImportExpression() {
         throw new SyntaxError('dynamic import() is not allowed in handlers');
       },
+      Identifier(node: { name: string; }) {
+        if (BLOCKED_IDENTIFIERS.includes(node.name)) {
+          throw new SyntaxError(`'${node.name}' is not allowed in handlers`);
+        }
+      },
+      ThisExpression() {
+        throw new SyntaxError('\'this\' is not allowed in handlers');
+      },
     });
 
     return tree;
   });
 
-  private kill_on_timeout = (child: ReturnType<typeof Bun.spawn>, timeout_ms: number) => {
-    return new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        child.kill();
-        reject(new Error(`sandbox execution timeout after ${timeout_ms}ms`, { cause: 'ETIMEDOUT' }));
-      }, timeout_ms);
-    });
+  private inject = (vm: ReturnType<Awaited<ReturnType<typeof getQuickJSWASMModule>>['newContext']>) => {
+    const crypto_obj = vm.newObject();
+    const random_uuid = vm.newFunction('randomUUID', () => vm.newString(crypto.randomUUID()));
+    vm.setProp(crypto_obj, 'randomUUID', random_uuid);
+    vm.setProp(vm.global, 'crypto', crypto_obj);
+    random_uuid.dispose();
+    crypto_obj.dispose();
   };
 
-  private wrapped = (code: string, context: SandboxContext) => {
-    return `
-    (async () => {
-      try {
-        const handler = (() => (${code}))();
-        const value = await handler(${JSON.stringify(context)});
-
-        process.stdout.write(JSON.stringify({ success: true, payload: value }));
-      } catch (err) {
-        const error = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { name: "Error", message: String(err) };
-
-        process.stdout.write(JSON.stringify({ success: false, error }));
-        process.exit(1);
-      }
-    })();`;
+  private wrap = (code: string, context: SandboxContext) => {
+    return `(function() { const handler = (${code}); return JSON.stringify(handler(${JSON.stringify(context)})); })()`;
   };
 
   execute = safe(async (code: string, context: SandboxContext) => {
-    const wrapped = this.wrapped(code, context);
-    const subprocess = Bun.spawn([this.bun_path, '-e', wrapped], { stdout: 'pipe', stderr: 'pipe', ...config?.sandbox });
+    const wasm_module = await getQuickJSWASMModule();
+    const runtime = wasm_module.newRuntime();
+    const start = Date.now();
 
-    await Promise.race([subprocess.exited, this.kill_on_timeout(subprocess, this.timeout)]);
-    const response = JSON.parse(await subprocess.stdout.text()) as SandboxResponse;
+    runtime.setMemoryLimit(1024 * 1024 * 10);
+    runtime.setMaxStackSize(1024 * 1024);
+    runtime.setInterruptHandler(() => Date.now() - start > this.timeout);
 
-    if (response.success) return response.payload;
+    const vm = runtime.newContext();
+    this.inject(vm);
+    const result = vm.evalCode(this.wrap(code, context));
+    const handle = result.error ?? result.value;
+    const output = vm.dump(handle);
 
-    throw Object.assign(new Error(response.error?.message ?? 'execution failed'), {
-      name: response.error?.name ?? 'SandboxError', stack: response.error?.stack,
-    });
+    dispose(handle, vm, runtime);
+
+    if (result.error) {
+      const timedout = Date.now() - start > this.timeout;
+      throw Object.assign(new Error(output?.message ?? 'execution failed'), timedout ? { cause: 'ETIMEDOUT' } : {});
+    }
+
+    return JSON.parse(output);
   });
 }
 

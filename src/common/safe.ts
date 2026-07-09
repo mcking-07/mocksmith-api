@@ -1,12 +1,11 @@
 import { safe as wrapper } from 'safe-wrapper';
+import { config } from '../config';
 import { loggerFor } from './logger';
 
-const logger = loggerFor(import.meta.url);
-
-const { env: { NODE_ENV } = {} } = process;
+const logger = loggerFor('common/safe');
 
 const default_transformer = (error: Error) => {
-  if (NODE_ENV !== 'test') logger.error('[!] safe: an error occurred:', error);
+  if (config?.environment !== 'test') logger.error('[!] safe: an error occurred:', error);
   return error;
 };
 

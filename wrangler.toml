@@ -1,0 +1,38 @@
+name = "mocksmith-api"
+main = "src/worker.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[dev]
+port = 6543
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = false
+
+[cache]
+enabled = true
+
+[placement]
+mode = "smart"
+
+[assets]
+directory = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mocksmith"
+database_id = "61daca48-158b-4cf2-8937-bd7257784d57"
+
+[vars]
+AUTH_ENABLED = "false"
+AUTH_SECRET = ""
+CORS_ORIGIN = "*"
+NODE_ENV = "production"

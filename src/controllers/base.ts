@@ -1,12 +1,10 @@
 import { responsify } from '../common';
-import { description, name, version } from '../../package.json';
-
-const { env: { NODE_ENV = 'development' } = {} } = process;
+import { config } from '../config';
 
 class BaseController {
   info = async () => {
     const response = {
-      name, version, description, runtime: `Bun ${Bun.version}`, environment: NODE_ENV,
+      name: 'mocksmith-api', version: '1.0.0', description: 'a simple api to forge mocks with ease.', runtime: 'cloudflare-workers', environment: config?.environment,
     };
 
     return responsify({ status: 200, body: response });

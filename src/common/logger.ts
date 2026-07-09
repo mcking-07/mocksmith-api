@@ -1,23 +1,22 @@
-import { sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createLogger, format, transports } from 'winston';
 import { async_store } from './context-store';
 
-const { combine, colorize, uncolorize, label, printf, splat, timestamp } = format;
-const { Console } = transports;
-
-const colors = process.env.NODE_ENV !== 'production';
-
-const formatter = printf(({ timestamp, label, level, message, ...meta }) => {
-  const request_id = async_store.getStore()?.request_id ?? 'anonymous';
-  return `[${timestamp}] [${label}] [${level}] [${request_id}]: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`;
-});
-
-const loggerFor = (filename: string, level: string = 'debug') => {
-  const path = fileURLToPath(filename).split(sep).slice(-3).join(sep);
-  const format = combine(label({ label: path }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), splat(), colors ? colorize() : uncolorize(), formatter);
-
-  return createLogger({ format, level, transports: [new Console({ format })] });
+const timestamp = () => {
+  const now = new Date();
+  return now.toISOString().replace('T', ' ').slice(0, 19);
 };
+
+const format = (label: string, level: string, message: string, meta: unknown[]) => {
+  const request_id = async_store.getStore()?.request_id ?? 'anonymous';
+  const suffix = meta.length ? ` ${meta.map(m => typeof m === 'string' ? m : JSON.stringify(m)).join(' ')}` : '';
+  return `[${timestamp()}] [${label}] [${level}] [${request_id}]: ${message}${suffix}`;
+};
+
+const loggerFor = (label: string) => ({
+  info: (message: string, ...meta: unknown[]) => console.log(format(label, 'info', message, meta)),
+  warn: (message: string, ...meta: unknown[]) => console.warn(format(label, 'warn', message, meta)),
+  error: (message: string, ...meta: unknown[]) => console.error(format(label, 'error', message, meta)),
+  http: (message: string, ...meta: unknown[]) => console.log(format(label, 'http', message, meta)),
+  debug: (message: string, ...meta: unknown[]) => console.debug(format(label, 'debug', message, meta)),
+});
 
 export { loggerFor };

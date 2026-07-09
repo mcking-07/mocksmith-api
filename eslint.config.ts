@@ -4,7 +4,7 @@ import ts from 'typescript-eslint';
 
 const config = [
   {
-    ignores: ['dist/**', 'node_modules/**', '.scratchpad/**'],
+    ignores: ['dist/**', 'node_modules/**', '.scratchpad/**', '.wrangler/**'],
   },
   js.configs.recommended,
   ...ts.configs.recommended,
@@ -74,6 +74,12 @@ const config = [
       'semi': ['error', 'always'],
       'sort-imports': ['error', { ignoreDeclarationSort: true }],
       // 'sort-keys': ['error', 'asc', { caseSensitive: true, natural: true }],
+    },
+  },
+  {
+    files: ['src/common/logger.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {

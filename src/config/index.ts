@@ -1,1 +1,1 @@
-export { config } from './config';
+export { bootstrap, config } from './config';

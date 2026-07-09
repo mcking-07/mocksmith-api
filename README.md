@@ -1,30 +1,52 @@
 # mocksmith-api
 
-[![Bun](https://img.shields.io/badge/Bun-1.3+-violet)](https://bun.sh)
-[![SQLite](https://img.shields.io/badge/SQLite-3-teal)](https://sqlite.org)
-[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-orange)](https://workers.cloudflare.com)
+[![D1](https://img.shields.io/badge/D1-SQLite-teal)](https://developers.cloudflare.com/d1)
+[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg?branch=cloudflare-workers)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](https://opensource.org/licenses/MIT)
 
-a general-purpose api mocking service built with bun and sqlite. dynamically create, manage, and serve rest-api endpoints with custom javascript handlers.
+a general-purpose api mocking service built with cloudflare workers and d1. dynamically create, manage, and serve rest-api endpoints with custom javascript handlers.
 
 ## overview
 
-mocksmith-api allows you to create, update and delete mock apis on-the-fly. define endpoints with custom javascript handlers that can access request data (query params, headers, path params, body) and return dynamic responses. features include path parameter support, request analytics, optional jwt authentication, and sqlite persistence.
+mocksmith-api allows you to create, update and delete mock apis on-the-fly. define endpoints with custom javascript handlers that can access request data (query params, headers, path params, body) and return dynamic responses. features include path parameter support, request analytics, optional jwt authentication, and d1 persistence.
+
+handlers execute in an isolated quickjs wasm sandbox — user code runs in a separate javascript engine with no access to worker bindings, environment variables, or the host runtime.
 
 ## quick start
 
 ```bash
 # install dependencies
-bun install
+npm install
 
-# setup database
-bun run db:create && bun run db:migrate
+# create d1 database (one-time)
+npx wrangler d1 create mocksmith
+# update database_id in wrangler.toml with the output
 
-# start server
-bun run dev
+# apply migrations locally
+npm run db:migrate:local
+
+# start dev server
+npm run dev
 ```
 
 the api will be available at `http://localhost:6543`.
+
+## deploy
+
+```bash
+# login to cloudflare (one-time)
+npx wrangler login
+
+# apply migrations to remote d1
+npm run db:migrate:remote
+
+# deploy
+npm run deploy
+
+# set secrets (if auth enabled)
+npx wrangler secret put AUTH_SECRET
+```
 
 ## architecture
 
@@ -33,7 +55,7 @@ the api will be available at `http://localhost:6543`.
 | `Router`          | custom middleware composition engine with path-to-regexp matching |
 | `Middleware`      | class-based, each implements `handle(context, next)`              |
 | `ServiceRegistry` | typed service locator for dependency wiring                       |
-| `SandboxService`  | subprocess-isolated javascript execution with timeout             |
+| `SandboxService`  | quickjs wasm-isolated javascript execution with timeout           |
 | `EventPublisher`  | node eventemitter-based pub/sub for decoupled analytics           |
 | `Repository`      | generic base with `create`, `read`, `update`, `delete`            |
 
@@ -84,89 +106,64 @@ handlers are **javascript arrow function strings** that receive a context object
 
 ## environment variables
 
-| variable        | default                   | description                   |
-| --------------- | ------------------------- | ----------------------------- |
-| `NODE_ENV`      | `development`             | `development` or `production` |
-| `HOSTNAME`      | `0.0.0.0`                 | server bind address           |
-| `PORT`          | `6543`                    | server port                   |
-| `DATABASE_PATH` | `./database/mocksmith.db` | sqlite file path              |
-| `AUTH_ENABLED`  | `false`                   | enable jwt auth               |
-| `AUTH_SECRET`   | -                         | jwt secret (if auth enabled)  |
-| `CORS_ORIGIN`   | `*`                       | allowed cors origins          |
+configured in `wrangler.toml` under `[vars]`. secrets via `npx wrangler secret put`.
+
+| variable       | default      | description                   |
+| -------------- | ------------ | ----------------------------- |
+| `NODE_ENV`     | `production` | `development` or `production` |
+| `AUTH_ENABLED` | `false`      | enable jwt auth               |
+| `AUTH_SECRET`  | -            | jwt secret (if auth enabled)  |
+| `CORS_ORIGIN`  | `*`          | allowed cors origins          |
 
 ## scripts
 
-| command              | description                 |
-| -------------------- | --------------------------- |
-| `bun run dev`        | development with hot reload |
-| `bun run start`      | production server           |
-| `bun run lint`       | run eslint                  |
-| `bun run test`       | run test suite              |
-| `bun run db:create`  | create database             |
-| `bun run db:migrate` | run migrations              |
-| `bun run db:status`  | check database status       |
-
-## docker
-
-pull and run the docker image:
-
-```bash
-docker pull mcking-07/mocksmith-api:latest
-docker run -p 6543:6543 mcking-07/mocksmith-api:latest
-```
-
-or build locally:
-
-```bash
-docker build -t mocksmith-api .
-docker run -p 6543:6543 mocksmith-api
-```
-
-or use the provided `docker-compose.yml` file.
-
-```bash
-docker compose up
-```
-
-**docker features:**
-
-- multi-stage build (deps → production)
-- non-root user (`mocksmith`)
-- resource limits (0.5 cpu, 512m memory)
-- separate migration init container
+| command                     | description                       |
+| --------------------------- | --------------------------------- |
+| `npm run dev`               | local dev server (localhost:6543) |
+| `npm run deploy`            | deploy to cloudflare              |
+| `npm run lint`              | run eslint                        |
+| `npm test`                  | run test suite (vitest)           |
+| `npm run db:migrate:local`  | apply d1 migrations locally       |
+| `npm run db:migrate:remote` | apply d1 migrations to production |
+| `npx wrangler tail`         | live tail production logs         |
 
 ## security
 
 ### sandbox isolation
 
-user-submitted handlers execute in isolated subprocesses:
+user-submitted handlers execute in an isolated quickjs wasm engine:
 
-| layer                  | mechanism                                                               |
-| ---------------------- | ----------------------------------------------------------------------- |
-| ast validation         | `acorn` parses handler code — rejects invalid syntax                    |
-| subprocess isolation   | runs via `bun -e` in a separate process — no shared memory              |
-| timeout enforcement    | subprocess killed after 10s (configurable via `config.sandbox.timeout`) |
-| restricted environment | `PATH`, `HOME`, `TMPDIR` scoped to `/tmp`, `cwd` set to `/tmp`          |
+| layer               | mechanism                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| ast validation      | `acorn` parses handler code — rejects invalid syntax                                                       |
+| blocked identifiers  | `eval`, `Function`, `globalThis`, `self`, `this`, `navigator`, `WebSocket`, `Atomics`, `SharedArrayBuffer` |
+| wasm isolation      | quickjs runs in a separate js engine — no access to worker env/bindings                                    |
+| memory limit        | 10mb per execution                                                                                         |
+| timeout enforcement | interrupt handler kills execution after 10s                                                                |
+| dynamic imports     | ast validation rejects `ImportExpression` nodes                                                            |
 
 ### attack vectors mitigated
 
 | vector              | mitigation                                                    |
 | ------------------- | ------------------------------------------------------------- |
-| infinite loops      | subprocess timeout with `SIGKILL`                             |
-| memory bombs        | subprocess timeout                                            |
-| file system access  | `cwd: /tmp`, minimal `PATH`                                   |
+| infinite loops       | quickjs interrupt handler terminates after timeout            |
+| memory bombs        | 10mb memory limit per execution                               |
+| env/secret access   | handler runs in separate wasm engine — no access to `env`     |
+| prototype pollution | fresh quickjs context per execution — no shared state         |
 | static imports      | `sourceType: 'script'` rejects `import`/`export` declarations |
 | dynamic `import()`  | ast validation rejects `ImportExpression` nodes               |
-| prototype pollution | fresh subprocess per execution — no shared state              |
+| `eval`/`Function`   | blocked by ast identifier check                                |
 
 ## design decisions
 
-### why subprocess sandboxing over vm2?
+### why quickjs wasm over new Function()?
 
-- `vm2` has known escape vulnerabilities (cve-2023-37466)
-- subprocess provides os-level isolation
-- timeout enforcement is reliable (`SIGKILL` vs cooperative cancellation)
-- trade-off: ~50ms overhead per handler execution
+- cloudflare workers blocks `eval()` and `new Function()` at request time
+- quickjs provides a completely separate javascript engine via wasm
+- handler code cannot access worker bindings, env vars, or global scope
+- memory and cpu limits enforced by quickjs runtime configuration
+- [dynamic workers](https://developers.cloudflare.com/dynamic-workers/) would be the ideal approach (true v8 isolate per handler), but requires the $5/month workers paid plan
+- quickjs wasm achieves the same isolation goal on the free tier
 
 ### why custom router over hono/elysia?
 
@@ -335,16 +332,16 @@ curl "http://localhost:6543/items?page=2&limit=3"
 curl -X post http://localhost:6543/endpoints   -H "content-type: application/json"   -d '{
     "path": "/profile",
     "method": "get",
-    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (!token) return { status: 401, headers: { \"www-authenticate\": \"bearer\" }, body: { error: \"authentication required\" } }; if (token !== "valid-token-123") return { status: 401, body: { error: \"invalid token\" } }; return { status: 200, body: { id: 1, name: "john", email: \"john@example.com\" } }; }"
+    "handler": "(context) => { const token = context.headers.authorization?.replace(\"bearer \", \"\"); if (!token) return { status: 401, headers: { \"www-authenticate\": \"bearer\" }, body: { error: \"authentication required\" } }; if (token !== \"valid-token-123\") return { status: 401, body: { error: \"invalid token\" } }; return { status: 200, body: { id: 1, name: \"john\", email: \"john@example.com\" } }; }"
   }'
 ```
 
 ```bash
 curl http://localhost:6543/profile
-# { "error": \"authentication required\" }
+# { "error": "authentication required" }
 
 curl http://localhost:6543/profile -H "authorization: bearer valid-token-123"
-# { "id": 1, "name": "john", "email": \"john@example.com\" }
+# { "id": 1, "name": "john", "email": "john@example.com" }
 ```
 
 **conditional response by header:**

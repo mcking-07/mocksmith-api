@@ -3,7 +3,7 @@ import { ValidationFailed } from '../errors';
 import { services } from '../services';
 import type { Context } from '../types';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('controllers/endpoints');
 
 class EndpointsController {
   private get_endpoints_service = () => {
@@ -15,7 +15,7 @@ class EndpointsController {
     const service = this.get_endpoints_service();
 
     logger.info(`finding ${id ? `endpoint with id ${id}` : 'all endpoints'}`);
-    const response = service.find(id);
+    const response = await service.find(id);
 
     logger.info(`found ${Array.isArray(response) ? response.length : 1} endpoint(s)`);
     return responsify({ status: 200, body: response });
@@ -29,7 +29,7 @@ class EndpointsController {
     if (!success) throw new ValidationFailed('validation failed', errors);
 
     const service = this.get_endpoints_service();
-    const response = service.create(payload.path, payload.method, payload.handler);
+    const response = await service.create(payload.path, payload.method, payload.handler);
 
     logger.info(`created endpoint with id ${response.id}`);
     return responsify({ status: 201, body: response });
@@ -44,7 +44,7 @@ class EndpointsController {
     if (!success) throw new ValidationFailed('validation failed', errors);
 
     const service = this.get_endpoints_service();
-    const response = service.update(id, payload.path, payload.method, payload.handler);
+    const response = await service.update(id, payload.path, payload.method, payload.handler);
 
     logger.info(`updated endpoint with id ${response.id}`);
     return responsify({ status: 200, body: response });
@@ -54,7 +54,7 @@ class EndpointsController {
     const id = context?.params?.id as string;
     const service = this.get_endpoints_service();
 
-    service.delete(id);
+    await service.delete(id);
     logger.info(`removed endpoint with id ${id}`);
 
     return responsify({ status: 200, body: { message: `endpoint ${id} removed successfully` } });

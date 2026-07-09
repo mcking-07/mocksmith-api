@@ -12,35 +12,35 @@ class EndpointsService {
     this.sandbox = sandbox;
   }
 
-  create = (path: string, method: string, handler: string) => {
+  create = async (path: string, method: string, handler: string) => {
     const normalized = method?.toUpperCase();
-    const existing = this.endpoints.find_by_path_and_method(path, normalized);
+    const existing = await this.endpoints.find_by_path_and_method(path, normalized);
     if (existing) throw new Conflict('endpoint already exists', { existing_id: existing.id });
 
     const [validation_error] = this.sandbox.validate(handler);
     if (validation_error) throw new ValidationFailed('handler contains invalid javascript', { cause: validation_error.message });
 
-    const [create_error, id] = this.endpoints.create({ path, method: normalized, handler });
+    const [create_error, id] = await this.endpoints.create({ path, method: normalized, handler });
     if (create_error || !id) throw new PersistenceFailed('failed to create endpoint', { path, method: normalized });
 
-    const endpoint = this.endpoints.read(id);
+    const endpoint = await this.endpoints.read(id);
     if (!endpoint) throw new PersistenceFailed('failed to read back endpoint after create', { id });
 
     EventPublisher.emit(new EndpointCreated({ id }));
     return endpoint;
   };
 
-  find = (id?: string) => {
+  find = async (id?: string) => {
     if (!id) return this.endpoints.find_active();
 
-    const endpoint = this.endpoints.read(id);
+    const endpoint = await this.endpoints.read(id);
     if (!endpoint) throw new NotFound(`endpoint not found with id ${id}`, { id });
 
     return endpoint;
   };
 
-  find_by_path_and_method = (path: string, method: string) => {
-    const endpoints = this.endpoints.find_by_method(method);
+  find_by_path_and_method = async (path: string, method: string) => {
+    const endpoints = await this.endpoints.find_by_method(method);
 
     for (const endpoint of endpoints) {
       const matcher = match(endpoint?.path);
@@ -52,8 +52,8 @@ class EndpointsService {
     throw new NotFound(`endpoint not found with path ${path} and method ${method}`, { path, method });
   };
 
-  update = (id: string, path?: string, method?: string, handler?: string) => {
-    const existing = this.endpoints.read(id);
+  update = async (id: string, path?: string, method?: string, handler?: string) => {
+    const existing = await this.endpoints.read(id);
     if (!existing) throw new NotFound(`endpoint not found with id ${id}`, { id });
 
     const changes = Object.fromEntries(Object.entries({ path, method: method?.toUpperCase(), handler }).filter(([_, value]) => value !== undefined));
@@ -64,21 +64,21 @@ class EndpointsService {
       if (validation_error) throw new ValidationFailed('handler contains invalid javascript', { cause: validation_error.message });
     }
 
-    const [update_error] = this.endpoints.update(id, changes);
+    const [update_error] = await this.endpoints.update(id, changes);
     if (update_error) throw new PersistenceFailed('failed to update endpoint', { id });
 
-    const updated = this.endpoints.read(id);
+    const updated = await this.endpoints.read(id);
     if (!updated) throw new PersistenceFailed('failed to read back endpoint after update', { id });
 
     EventPublisher.emit(new EndpointUpdated({ id: updated.id }));
     return updated;
   };
 
-  delete = (id: string) => {
-    const existing = this.endpoints.read(id);
+  delete = async (id: string) => {
+    const existing = await this.endpoints.read(id);
     if (!existing) throw new NotFound(`endpoint not found with id ${id}`, { id });
 
-    const [delete_error] = this.endpoints.delete(id);
+    const [delete_error] = await this.endpoints.delete(id);
     if (delete_error) throw new PersistenceFailed('failed to delete endpoint', { id });
 
     EventPublisher.emit(new EndpointDeleted({ id: existing.id }));

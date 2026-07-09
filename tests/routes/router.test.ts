@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, vi, test } from 'vitest';
 import { Router } from '../../src/routes/router';
 import { NotFound } from '../../src/errors';
 
 describe('Router', () => {
-  const handler = mock(async () => new Response('OK'));
-  const next = mock(() => Promise.resolve(new Response('OK')));
+  const handler = vi.fn(async () => new Response('OK'));
+  const next = vi.fn(() => Promise.resolve(new Response('OK')));
 
   const url = 'https://mocksmith-api.mcking.in';
   const requestify = (path: string, options = {}) => new Request(`${url}${path}`, options);
@@ -49,13 +49,13 @@ describe('Router', () => {
   describe('middlewares', () => {
     test('should register and apply global middleware', async () => {
       const middleware = {
-        handle: mock(async (context, next) => {
+        handle: vi.fn(async (context, next) => {
           context.state.set('middleware', 'ran');
           return next();
         })
       };
 
-      const handler = mock(async (context) => new Response(context.state.get('middleware')));
+      const handler = vi.fn(async (context) => new Response(context.state.get('middleware')));
 
       const router = new Router();
       router.use(middleware);
@@ -71,7 +71,7 @@ describe('Router', () => {
 
     test('should skip specified middleware for a route', async () => {
       class Middleware {
-        handle = mock(async (_context, next) => next());
+        handle = vi.fn(async (_context, next) => next());
       }
 
       const middleware = new Middleware();
@@ -89,13 +89,13 @@ describe('Router', () => {
 
     test('should apply route-specific middleware before the route handler', async () => {
       const middleware = {
-        handle: mock(async (context, next) => {
+        handle: vi.fn(async (context, next) => {
           context.state.set('route_middleware', 'ran');
           return next();
         })
       };
 
-      const handler = mock(async (context) => {
+      const handler = vi.fn(async (context) => {
         return new Response(context.state.get('route_middleware'));
       });
 
@@ -112,20 +112,20 @@ describe('Router', () => {
 
     test('should execute multiple middleware in registration order', async () => {
       const first_middleware = {
-        handle: mock(async (context, next) => {
+        handle: vi.fn(async (context, next) => {
           context.state.set('order', `${context.state.get('order') ?? ''}1`);
           return next();
         })
       };
 
       const second_middleware = {
-        handle: mock(async (context, next) => {
+        handle: vi.fn(async (context, next) => {
           context.state.set('order', `${context.state.get('order') ?? ''}2`);
           return next();
         })
       };
 
-      const handler = mock(async (context) => new Response(context.state.get('order')));
+      const handler = vi.fn(async (context) => new Response(context.state.get('order')));
 
       const router = new Router();
       router.use(first_middleware);
@@ -146,7 +146,7 @@ describe('Router', () => {
     test('should extract path parameters from the request url', async () => {
       const router = new Router();
 
-      const single_param_handler = mock(async (context) => new Response(context.params.id));
+      const single_param_handler = vi.fn(async (context) => new Response(context.params.id));
       router.route('GET', '/api/users/:id', single_param_handler);
 
       const single_response = await router.handle(requestify('/api/users/1234'));
@@ -155,7 +155,7 @@ describe('Router', () => {
       expect(single_param_handler).toHaveBeenCalled();
       expect(single_text).toBe('1234');
 
-      const multi_param_handler = mock(async (context) => new Response(`${context.params.userId}/${context.params.postId}`));
+      const multi_param_handler = vi.fn(async (context) => new Response(`${context.params.userId}/${context.params.postId}`));
       router.route('GET', '/api/users/:userId/posts/:postId', multi_param_handler);
 
       const multi_response = await router.handle(requestify('/api/users/123/posts/456'));
@@ -167,7 +167,7 @@ describe('Router', () => {
 
     test('should throw not found when no matching route exists', async () => {
       const router = new Router();
-      expect(router.handle(requestify('/api/nonexistent'))).rejects.toThrowError(NotFound);
+      await expect(router.handle(requestify('/api/nonexistent'))).rejects.toThrow(NotFound);
     });
   });
 });

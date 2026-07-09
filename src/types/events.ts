@@ -3,7 +3,7 @@ type BaseEventPayload = {
   category?: string;
 } & Record<string, unknown>;
 
-type EventHandler<PayloadType> = (event: PayloadType) => void;
+type EventHandler<PayloadType> = (event: PayloadType) => void | Promise<void>;
 
 type ListenerType = {
   register: () => void;

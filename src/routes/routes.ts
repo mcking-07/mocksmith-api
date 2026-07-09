@@ -1,4 +1,5 @@
 import { AnalyticsController, BaseController, EndpointsController, HealthController, ServingController } from '../controllers';
+import { AccessLog, Authentication, BodyParser, RateLimiter } from '../middlewares';
 import type { Router } from './router';
 
 const configure = (router: Router) => {
@@ -12,6 +13,7 @@ const configure = (router: Router) => {
 
   router.route('GET', '/', controllers.base.info);
   router.route('GET', '/healthcheck', controllers.healthcheck.check);
+  router.route('GET', '/.well-known/appspecific/com.chrome.devtools.json', async () => new Response(null, { status: 204 }), { skip: [AccessLog, Authentication, RateLimiter, BodyParser] });
 
   router.route('GET', '/analytics', controllers.analytics.read);
   router.route('GET', '/analytics/:id', controllers.analytics.read);

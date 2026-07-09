@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, vi, test } from 'vitest';
 import { CORS } from '../../src/middlewares/cors';
 
 describe('CORS', () => {
   describe('handle', () => {
-    const next = mock(() => Promise.resolve(new Response('OK')));
+    const next = vi.fn(() => Promise.resolve(new Response('OK')));
     const origins = ['https://allowed.com', 'https://also-allowed.com'] as const;
 
     const endpoint = 'https://mocksmith-api.mcking.in/endpoints';

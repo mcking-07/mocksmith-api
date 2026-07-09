@@ -5,7 +5,7 @@ import { EndpointRequested, EventPublisher } from '../eventing';
 import { services } from '../services';
 import type { Context } from '../types';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('controllers/serving');
 
 class ServingController {
   private get_endpoints_service = () => {
@@ -23,7 +23,7 @@ class ServingController {
     const endpoints = this.get_endpoints_service();
     const sandbox = this.get_sandbox_service();
 
-    const endpoint = endpoints.find_by_path_and_method(pathname, method);
+    const endpoint = await endpoints.find_by_path_and_method(pathname, method);
     logger.info(`matched endpoint ${endpoint?.id} for path ${pathname} and method ${method}`);
 
     const query = Object.fromEntries(url.searchParams);

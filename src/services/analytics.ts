@@ -1,7 +1,7 @@
 import { loggerFor, safe } from '../common';
 import type { AnalyticsRepository } from '../database';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('services/analytics');
 
 class AnalyticsService {
   private readonly analytics: AnalyticsRepository;
@@ -9,7 +9,7 @@ class AnalyticsService {
     this.analytics = analytics;
   }
 
-  find = (id?: string) => {
+  find = async (id?: string) => {
     if (!id) {
       logger.info('reading analytics for all endpoints');
       return this.analytics.read();
@@ -19,7 +19,7 @@ class AnalyticsService {
     return this.analytics.find_by_endpoint_id(id);
   };
 
-  increment = safe((endpoint_id: string) => {
+  increment = safe(async (endpoint_id: string) => {
     logger.info(`incrementing analytics for endpoint_id: ${endpoint_id}`);
     return this.analytics.increment(endpoint_id);
   });

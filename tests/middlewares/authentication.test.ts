@@ -1,13 +1,18 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { SignJWT } from 'jose';
+import { beforeEach, describe, expect, vi, test } from 'vitest';
 import { Unauthorized } from '../../src/errors';
-import { setup } from '../setup';
+import { Authentication } from '../../src/middlewares/authentication';
 
-describe('Authentication', async () => {
-  await setup();
-  const { Authentication } = await import('../../src/middlewares/authentication');
+const SECRET = 'test-secret-key-for-authentication';
 
+const create_token = async (payload: Record<string, unknown> = { user: 'test-user' }) => {
+  const secret = new TextEncoder().encode(SECRET);
+  return await new SignJWT(payload).setProtectedHeader({ alg: 'HS256' }).setExpirationTime('1h').sign(secret);
+};
+
+describe('Authentication', () => {
   describe('handler', () => {
-    const next = mock(() => Promise.resolve(new Response('OK')));
+    const next = vi.fn(() => Promise.resolve(new Response('OK')));
     const endpoint = 'https://mocksmith-api.mcking.in/endpoints';
 
     const contextify = (overrides = {}) => ({
@@ -27,32 +32,33 @@ describe('Authentication', async () => {
     });
 
     test('should throw an error when bearer token is missing', async () => {
-      const middleware = new Authentication({ enabled: true, secret: 'secret' });
+      const middleware = new Authentication({ enabled: true, secret: SECRET });
       const context = contextify();
 
-      expect(middleware.handle(context, next)).rejects.toThrowError(Unauthorized);
-      expect(middleware.handle(context, next)).rejects.toThrow('bearer token is missing');
+      await expect(middleware.handle(context, next)).rejects.toThrow(Unauthorized);
+      await expect(middleware.handle(context, next)).rejects.toThrow('bearer token is missing');
     });
 
     test('should throw an error when bearer token is invalid', async () => {
-      const middleware = new Authentication({ enabled: true, secret: 'secret' });
-      const context = contextify({ req: new Request(endpoint, { headers: { Authorization: 'Bearer Invalid' } }) });
+      const middleware = new Authentication({ enabled: true, secret: SECRET });
+      const context = contextify({ req: new Request(endpoint, { headers: { Authorization: 'Bearer InvalidToken' } }) });
 
-      expect(middleware.handle(context, next)).rejects.toThrowError(Unauthorized);
-      expect(middleware.handle(context, next)).rejects.toThrow('invalid or expired token');
+      await expect(middleware.handle(context, next)).rejects.toThrow(Unauthorized);
+      await expect(middleware.handle(context, next)).rejects.toThrow('invalid or expired token');
     });
 
     test('should throw an error when misconfigured (no secret)', async () => {
       const middleware = new Authentication({ enabled: true });
       const context = contextify({ req: new Request(endpoint, { headers: { Authorization: 'Bearer Token' } }) });
 
-      expect(middleware.handle(context, next)).rejects.toThrowError(Unauthorized);
-      expect(middleware.handle(context, next)).rejects.toThrow('authentication misconfigured');
+      await expect(middleware.handle(context, next)).rejects.toThrow(Unauthorized);
+      await expect(middleware.handle(context, next)).rejects.toThrow('authentication misconfigured');
     });
 
     test('should allow valid bearer tokens', async () => {
-      const middleware = new Authentication({ enabled: true, secret: 'secret' });
-      const context = contextify({ req: new Request(endpoint, { headers: { Authorization: 'Bearer Valid' } }) });
+      const token = await create_token();
+      const middleware = new Authentication({ enabled: true, secret: SECRET });
+      const context = contextify({ req: new Request(endpoint, { headers: { Authorization: `Bearer ${token}` } }) });
 
       await middleware.handle(context, next);
 

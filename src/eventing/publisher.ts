@@ -3,7 +3,7 @@ import { loggerFor, safe } from '../common';
 import type { EventHandler } from '../types';
 import type { BaseEvent } from './events';
 
-const logger = loggerFor(import.meta.url);
+const logger = loggerFor('eventing/publisher');
 
 const emitter = new EventEmitter();
 

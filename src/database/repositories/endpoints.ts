@@ -8,19 +8,19 @@ class EndpointsRepository extends Repository<EndpointsType> {
     super(database, 'endpoints');
   }
 
-  find_by_path_and_method = (path: string, method: string) => {
+  find_by_path_and_method = async (path: string, method: string) => {
     return this.database.get<EndpointsType>('SELECT * FROM endpoints WHERE path = ? AND method = ? AND deleted_at IS NULL', [path, method]);
   };
 
-  find_by_method = (method: string) => {
+  find_by_method = async (method: string) => {
     return this.database.query<EndpointsType>('SELECT * FROM endpoints WHERE method = ? AND deleted_at IS NULL', [method]);
   };
 
-  find_active = () => {
+  find_active = async () => {
     return this.database.query<EndpointsType>('SELECT * FROM endpoints WHERE deleted_at IS NULL ORDER BY created_at DESC');
   };
 
-  override delete = safe((id: string) => {
+  override delete = safe(async (id: string) => {
     return this.database.run('UPDATE endpoints SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
   });
 }
