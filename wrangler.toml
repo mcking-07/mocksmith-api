@@ -18,7 +18,7 @@ enabled = true
 persist = false
 
 [cache]
-enabled = true
+enabled = false
 
 [placement]
 mode = "smart"
