@@ -5,16 +5,18 @@ import { Router, configure } from './routes';
 import { bootstrap as bootstrap_services } from './services';
 import type { EnvironmentType } from './types';
 
-let router: Router | null = null;
+const state = { router: undefined } as { router?: Router };
 
 const bootstrap = (env: EnvironmentType) => {
-  if (router) return router;
+  if (state.router) return state.router;
 
   bootstrap_config(env);
   bootstrap_services(env);
   listeners.initialize();
 
-  router = new Router();
+  state.router = new Router();
+  const { router } = state;
+
   router.use(new RequestContext());
   router.use(new AccessLog());
   router.use(new Authentication({ ...config?.middleware?.authentication }));

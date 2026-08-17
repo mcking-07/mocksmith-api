@@ -1,9 +1,9 @@
 import type { ConfigType, EnvironmentType } from '../types';
 
-let config: ConfigType;
+const config = {} as ConfigType;
 
 const bootstrap = (env: EnvironmentType) => {
-  config = {
+  Object.assign(config, {
     environment: env.NODE_ENV ?? 'development',
     middleware: {
       authentication: {
@@ -21,7 +21,7 @@ const bootstrap = (env: EnvironmentType) => {
     sandbox: {
       timeout: 10000,
     },
-  };
+  });
 
   return config;
 };
