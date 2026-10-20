@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [cloudflare-workers]
+    branches: [main]
   pull_request:
-    branches: [cloudflare-workers]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -2,10 +2,12 @@
 
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-orange)](https://workers.cloudflare.com)
 [![D1](https://img.shields.io/badge/D1-SQLite-teal)](https://developers.cloudflare.com/d1)
-[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg?branch=cloudflare-workers)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
+[![ci](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mcking-07/mocksmith-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](https://opensource.org/licenses/MIT)
 
 a general-purpose api mocking service built with cloudflare workers and d1. dynamically create, manage, and serve rest-api endpoints with custom javascript handlers.
+
+> this project started out on bun and sqlite. that version is available on the [`bun-sqlite`](https://github.com/mcking-07/mocksmith-api/tree/bun-sqlite) branch.
 
 ## overview
 
